@@ -98,7 +98,18 @@ jobs:
         run: |
           # 调试：检查 Secret 是否存在
           if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
-            echo "⚠️ TAURI_SIGNING_PRIVATE_KEY Secret 为空，跳过签名（构建产物将不含 updater 签名）"
+            echo "⚠️ TAURI_SIGNING_PRIVATE_KEY Secret 为空，生成临时签名密钥"
+            KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
+            # 使用 pnpm tauri 生成临时 minisign 密钥对
+            pnpm tauri signer generate -w "$KEY_PATH" --force 2>&1 || true
+            if [ -f "$KEY_PATH" ]; then
+              KEY_B64=$(base64 < "$KEY_PATH" | tr -d '\r\n')
+              echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64" >> "$GITHUB_ENV"
+              echo "✅ 临时签名密钥已生成"
+            else
+              echo "❌ 无法生成临时密钥" >&2
+              exit 1
+            fi
             exit 0
           fi
 
